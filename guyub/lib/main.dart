@@ -70,10 +70,84 @@ class DaftarKartu extends StatelessWidget {
           padding: EdgeInsetsGeometry.all(8),
           child: ListTile (
             title: Text( item.judul),
-            subtitle: Text('${item.code} - ${item.penanggungjawab}'),
+            subtitle: Text(
+              '${item.code} — ${item.penanggungjawab ?? 'belum ada penanggung jawab'}',
+            ),
+            trailing: Text(item.status),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DetailKartu(item: item),
+                ),
+              );
+            },
           ),
         );
       },
+    );
+  }
+}
+
+class DetailKartu extends StatefulWidget {
+  const DetailKartu({super.key, required this.item});
+  final ItemBacklog item;
+
+  @override
+  State<DetailKartu> createState() => _DetailKartuState();
+}
+
+class _DetailKartuState extends State<DetailKartu> {
+  late String status = widget.item.status;
+  final List<String> urutan = ['To Do', 'In Progress', 'Review', 'Done'];
+
+  @override
+  Widget build(BuildContext context) {
+    final int index = urutan.indexOf(status);
+    final bool adaPJ = widget.item.penanggungjawab != null;
+    final bool isDone = status == 'Done';
+
+    String teksTombol = 'Sudah Done';
+    VoidCallback? fungsiTombol;
+
+    if (!isDone && index >= 0 && index < urutan.length - 1) {
+      final berikutnya = urutan[index + 1];
+      teksTombol = 'Pindah ke $berikutnya';
+      
+      if (adaPJ) {
+        fungsiTombol = () => setState(() => status = berikutnya);
+      }
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.item.code)),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.item.judul, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('${widget.item.code} • ${widget.item.jenis} • ${widget.item.poin} poin'),
+            const SizedBox(height: 8),
+            Text('Penanggung jawab: ${widget.item.penanggungjawab ?? 'belum ada penanggung jawab'}'),
+            const SizedBox(height: 8),
+            Text('Status: $status'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: fungsiTombol,
+              child: Text(teksTombol),
+            ),
+            if (!adaPJ) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Kartu tanpa penanggung jawab tidak bisa dipindah.',
+                style: TextStyle(color: Colors.red),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
