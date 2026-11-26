@@ -7,24 +7,19 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:guyub/main.dart';
+import 'package:guyub/api.dart';
+import 'package:guyub/isi_papan.dart';
+import 'package:guyub/papan_model.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MaterialApp());
+  testWidgets('Guyub displays an initial board card', (tester) async {
+    final papan = PapanModel(ambil: ambilContoh);
+    await papan.muat();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: IsiPapan(papan: papan))),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Halaman menu roti'), findsOneWidget);
   });
 }

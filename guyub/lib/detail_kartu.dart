@@ -1,0 +1,54 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'main.dart';
+import 'papan_model.dart';
+
+const urutanStatus = ['To Do', 'In Progress', 'Review', 'Done'];
+
+class DetailKartu extends StatelessWidget {
+  const DetailKartu({super.key, required this.item});
+
+  final ItemBacklog item;
+
+  @override
+  Widget build(BuildContext context) {
+    context.watch<PapanModel>();
+    final posisi = urutanStatus.indexOf(item.status);
+    final berikutnya = posisi >= 0 && posisi < urutanStatus.length - 1
+        ? urutanStatus[posisi + 1]
+        : null;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(item.judul)),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 8,
+          children: [
+            Text('Kode: ${item.kode}'),
+            Text('Poin: ${item.poin}'),
+            Text('Penanggung jawab: ${item.penanggungJawab ?? 'belum ada'}'),
+            Text('Status: ${item.status}'),
+            if (berikutnya != null)
+              FilledButton(
+                onPressed: () => context.read<PapanModel>().ubahStatus(
+                  item.kode,
+                  berikutnya,
+                ),
+                child: Text('Pindah ke $berikutnya'),
+              ),
+            OutlinedButton(
+              onPressed: () {
+                context.read<PapanModel>().ubahStatus(item.kode, 'Done');
+                Navigator.pop(context, true);
+              },
+              child: const Text('Selesai'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,153 +1,158 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'api.dart';
+import 'detail_kartu.dart';
+import 'isi_papan.dart';
+import 'papan_model.dart';
 
 void main() {
-  runApp(const MaterialApp(home : LayarGuyub()));
-}
-
-class ItemBacklog {
-  final String code;
-  final String judul;
-  final String jenis;
-  final int poin;
-  final String status;
-  final String? penanggungjawab;
-
-  const ItemBacklog(
-  this.code,
-  this.judul,
-  this.jenis,
-  this.poin,
-  this.status,
-  this.penanggungjawab,
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => PapanModel()..muat(),
+      child: const MaterialApp(home: LayarPapan()),
+    ),
   );
 }
 
-const daftarItem = [
-  ItemBacklog('GYB-001', 'Halaman menu roti', 'story', 5, 'Done', 'Sekar'),
-  ItemBacklog('GYB-002', 'Form pesanan', 'story', 5, 'Review', 'Bayu'),
-  ItemBacklog(
-    'GYB-003',
-    'Tombol pesan tidak aktif di Safari',
-    'bug',
-    2,
-    'In Progress',
-    'Dimas',
-  ),
-  ItemBacklog(
-    'GYB-004',
-    'Ongkir dihitung per kecamatan',
-    'story',
-    3,
-    'To Do',
-    'Bayu',
-  ),
-  ItemBacklog('GYB-005', 'Foto produk lambat dimuat', 'bug', 2, 'To Do', null),
-];
+// Class ItemBacklog
+class ItemBacklog {
+  final String kode;
+  final String judul;
+  final String jenis;
+  final int poin;
+  String status; // Bisa berubah, dipakai di A4.
+  final String? penanggungJawab;
 
+  ItemBacklog(
+    this.kode,
+    this.judul,
+    this.jenis,
+    this.poin,
+    this.status,
+    this.penanggungJawab,
+  );
 
-class LayarGuyub extends StatelessWidget{
-  const LayarGuyub({super.key});
+  // Nama di server (penanggung_jawab) boleh berbeda dari nama field di Dart.
+  factory ItemBacklog.fromJson(Map<String, dynamic> json) {
+    return ItemBacklog(
+      json['kode'],
+      json['judul'],
+      json['jenis'],
+      json['poin'],
+      json['status'],
+      json['penanggung_jawab'],
+    );
+  }
+}
+
+class LayarPapan extends StatefulWidget {
+  const LayarPapan({super.key});
+
+  @override
+  State<LayarPapan> createState() => _LayarPapanState();
+}
+
+class _LayarPapanState extends State<LayarPapan> {
+  // Form kartu baru, lalu pesan menurut kode status.
+  Future<void> bukaFormTambah() async {
+    final judul = TextEditingController();
+    final poin = TextEditingController();
+    final simpan = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kartu baru'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: judul,
+              decoration: const InputDecoration(labelText: 'Judul'),
+            ),
+            TextField(
+              controller: poin,
+              decoration: const InputDecoration(labelText: 'Poin'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+    if (simpan != true) return;
+
+    String pesan;
+    try {
+      final kode = await tambahItem(judul.text, int.tryParse(poin.text) ?? 0);
+      if (kode == 201) {
+        pesan = 'Kartu ditambahkan';
+        if (!mounted) return;
+        await context.read<PapanModel>().muat();
+      } else if (kode == 422) {
+        pesan = 'Judul wajib diisi dan poin paling kecil 1';
+      } else {
+        pesan = 'Server menjawab $kode';
+      }
+    } catch (e) {
+      pesan = 'Server tidak bisa dihubungi';
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(pesan)));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Guyub")),
-      body: DaftarKartu() ,
+      appBar: AppBar(title: const Text('Guyub')),
+      body: IsiPapan(papan: context.watch<PapanModel>()),
+      floatingActionButton: FloatingActionButton(
+        onPressed: bukaFormTambah,
+        tooltip: 'Tambah kartu',
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }
 
 class DaftarKartu extends StatelessWidget {
-  const DaftarKartu({super.key});
+  const DaftarKartu({super.key, required this.items});
+
+  final List<ItemBacklog> items;
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      itemCount: daftarItem.length,
+      itemCount: items.length,
       itemBuilder: (context, i) {
-        final item = daftarItem[i];
-        return Padding(
-          padding: EdgeInsetsGeometry.all(8),
-          child: ListTile (
-            title: Text( item.judul),
-            subtitle: Text(
-              '${item.code} — ${item.penanggungjawab ?? 'belum ada penanggung jawab'}',
-            ),
-            trailing: Text(item.status),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DetailKartu(item: item),
-                ),
-              );
-            },
+        final item = items[i];
+        return ListTile(
+          title: Text(item.judul),
+          subtitle: Text(
+            '${item.kode} · ${item.penanggungJawab ?? 'belum ada penanggung jawab'}',
           ),
+          trailing: Text(item.status),
+          onTap: () async {
+            final selesai = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DetailKartu(item: item),
+              ),
+            );
+            if (selesai != true || !context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${item.judul} selesai')),
+            );
+          },
         );
       },
-    );
-  }
-}
-
-class DetailKartu extends StatefulWidget {
-  const DetailKartu({super.key, required this.item});
-  final ItemBacklog item;
-
-  @override
-  State<DetailKartu> createState() => _DetailKartuState();
-}
-
-class _DetailKartuState extends State<DetailKartu> {
-  late String status = widget.item.status;
-  final List<String> urutan = ['To Do', 'In Progress', 'Review', 'Done'];
-
-  @override
-  Widget build(BuildContext context) {
-    final int index = urutan.indexOf(status);
-    final bool adaPJ = widget.item.penanggungjawab != null;
-    final bool isDone = status == 'Done';
-
-    String teksTombol = 'Sudah Done';
-    VoidCallback? fungsiTombol;
-
-    if (!isDone && index >= 0 && index < urutan.length - 1) {
-      final berikutnya = urutan[index + 1];
-      teksTombol = 'Pindah ke $berikutnya';
-      
-      if (adaPJ) {
-        fungsiTombol = () => setState(() => status = berikutnya);
-      }
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.item.code)),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.item.judul, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('${widget.item.code} • ${widget.item.jenis} • ${widget.item.poin} poin'),
-            const SizedBox(height: 8),
-            Text('Penanggung jawab: ${widget.item.penanggungjawab ?? 'belum ada penanggung jawab'}'),
-            const SizedBox(height: 8),
-            Text('Status: $status'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: fungsiTombol,
-              child: Text(teksTombol),
-            ),
-            if (!adaPJ) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Kartu tanpa penanggung jawab tidak bisa dipindah.',
-                style: TextStyle(color: Colors.red),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }
